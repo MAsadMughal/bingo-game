@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bingo Game 10x10</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: linear-gradient(to bottom, #f8f9fc, #e2e6ea);
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      color: #2c3e50;
+      text-align: center;
+    }
+
+    .game-container {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 4px;
+      width: 100%;
+      max-width: 500px;
+      aspect-ratio: 1 / 1;
+      margin: 20px 0;
+    }
+
+    .cell {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 1px solid #bdc3c7;
+      border-radius: 6px;
+      background-color: #ecf0f1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: clamp(12px, 2.5vw, 18px);
+      font-weight: 600;
+      color: #2c3e50;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.2s, transform 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .cell:hover {
+      background-color: #dfe6e9;
+      transform: scale(1.05);
+    }
+
+    .cell.marked {
+      background-color: #81ecec;
+      color: #2d3436;
+      border-color: #00cec9;
+    }
+
+    .cell.locked {
+      background-color: #55efc4;
+      color: #2d3436;
+      border-color: #00b894;
+      cursor: default;
+    }
+
+    .cell.highlighted {
+      outline: 3px solid red!important;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      margin: 10px 5px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background-color: #0984e3;
+      color: #fff;
+      font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      transition: background-color 0.2s, transform 0.2s;
+    }
+
+    button:hover {
+      background-color: #74b9ff;
+      transform: translateY(-2px);
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .search-container {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input[type="number"] {
+      padding: 8px;
+      font-size: 16px;
+      width: 100px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
+    .stats {
+      font-size: 18px;
+      color: #2d3436;
+      margin-top: 10px;
+    }
+
+    .bingo-message {
+      font-size: 28px;
+      font-weight: bold;
+      color: #d63031;
+      margin-top: 12px;
+      height: 30px;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bingo Game (10x10)</h1>
+
+  <div class="controls">
+    <button id="randomize-btn">Randomize Numbers</button>
+
+    <div class="search-container">
+      <input type="number" id="search-input" min="1" max="100" placeholder="Search #" />
+      <button id="search-btn">Find</button>
+      <button id="remove-btn">Remove Search</button>
+    </div>
+  </div>
+
+  <div class="game-container" id="game-grid"></div>
+  <div class="stats">
+    Completed Lines: <span id="completed-rows">0</span>/5
+  </div>
+  <div class="bingo-message" id="bingo-message"></div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const grid = document.getElementById("game-grid");
+      const randomizeBtn = document.getElementById("randomize-btn");
+      const completedRowsSpan = document.getElementById("completed-rows");
+      const bingoMessage = document.getElementById("bingo-message");
+      const searchInput = document.getElementById("search-input");
+      const searchBtn = document.getElementById("search-btn");
+      const removeBtn = document.getElementById("remove-btn");
+
+      const GRID_SIZE = 10;
+      let cells = [];
+      let completedRows = 0;
+      let lockedRows = new Set();
+      let lockedCols = new Set();
+
+      function initializeGrid() {
+        grid.innerHTML = "";
+        cells = [];
+        completedRows = 0;
+        lockedRows = new Set();
+        lockedCols = new Set();
+        completedRowsSpan.textContent = "0";
+        bingoMessage.textContent = "";
+
+        for (let i = 0; i < GRID_SIZE * GRID_SIZE; i++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.dataset.index = i;
+          cell.dataset.row = Math.floor(i / GRID_SIZE);
+          cell.dataset.col = i % GRID_SIZE;
+          cell.addEventListener("click", toggleCell);
+          grid.appendChild(cell);
+          cells.push(cell);
+        }
+      }
+
+      function randomizeNumbers() {
+        const confirmReset = confirm("Are you sure you want to start a new game?");
+        if (!confirmReset) return;
+
+        initializeGrid();
+        localStorage.removeItem("bingoGameState");
+
+        const numbers = Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, i) => i + 1);
+        shuffleArray(numbers);
+        cells.forEach((cell, index) => {
+          cell.textContent = numbers[index];
+        });
+      }
+
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      function toggleCell(e) {
+        const cell = e.target;
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+        if (lockedRows.has(row) || lockedCols.has(col)) return;
+
+        cell.classList.toggle("marked");
+        checkCompletedLines();
+        saveGameState();
+      }
+
+      function checkCompletedLines() {
+        for (let row = 0; row < GRID_SIZE; row++) {
+          if (lockedRows.has(row)) continue;
+          let complete = true;
+          for (let col = 0; col < GRID_SIZE; col++) {
+            const index = row * GRID_SIZE + col;
+            if (!cells[index].classList.contains("marked") &&
+                !cells[index].classList.contains("locked")) {
+              complete = false;
+              break;
+            }
+          }
+          if (complete) lockRow(row);
+        }
+
+        for (let col = 0; col < GRID_SIZE; col++) {
+          if (lockedCols.has(col)) continue;
+          let complete = true;
+          for (let row = 0; row < GRID_SIZE; row++) {
+            const index = row * GRID_SIZE + col;
+            if (!cells[index].classList.contains("marked") &&
+                !cells[index].classList.contains("locked")) {
+              complete = false;
+              break;
+            }
+          }
+          if (complete) lockColumn(col);
+        }
+      }
+
+      function lockRow(row) {
+        lockedRows.add(row);
+        completedRows++;
+        completedRowsSpan.textContent = completedRows;
+        for (let col = 0; col < GRID_SIZE; col++) {
+          const index = row * GRID_SIZE + col;
+          cells[index].classList.remove("marked");
+          cells[index].classList.add("locked");
+        }
+        checkBingo();
+        saveGameState();
+      }
+
+      function lockColumn(col) {
+        lockedCols.add(col);
+        completedRows++;
+        completedRowsSpan.textContent = completedRows;
+        for (let row = 0; row < GRID_SIZE; row++) {
+          const index = row * GRID_SIZE + col;
+          cells[index].classList.remove("marked");
+          cells[index].classList.add("locked");
+        }
+        checkBingo();
+        saveGameState();
+      }
+
+      function checkBingo() {
+        if (completedRows >= 5) {
+          bingoMessage.textContent = "BINGO!";
+        }
+      }
+
+      function saveGameState() {
+        const cellStates = cells.map(cell => ({
+          text: cell.textContent,
+          marked: cell.classList.contains("marked"),
+          locked: cell.classList.contains("locked")
+        }));
+        const state = {
+          cellStates,
+          completedRows,
+          lockedRows: Array.from(lockedRows),
+          lockedCols: Array.from(lockedCols)
+        };
+        localStorage.setItem("bingoGameState", JSON.stringify(state));
+      }
+
+      function loadGameState() {
+        const saved = localStorage.getItem("bingoGameState");
+        if (!saved) return;
+
+        const state = JSON.parse(saved);
+        completedRows = state.completedRows;
+        completedRowsSpan.textContent = completedRows;
+        lockedRows = new Set(state.lockedRows);
+        lockedCols = new Set(state.lockedCols);
+
+        state.cellStates.forEach((data, i) => {
+          const cell = cells[i];
+          cell.textContent = data.text;
+          cell.classList.remove("marked", "locked");
+          if (data.marked) cell.classList.add("marked");
+          if (data.locked) cell.classList.add("locked");
+        });
+
+        if (completedRows >= 5) {
+          bingoMessage.textContent = "BINGO!";
+        }
+      }
+
+      function searchNumber() {
+        const num = searchInput.value.trim();
+        cells.forEach(cell => cell.classList.remove("highlighted"));
+        if (num === "") return;
+
+        cells.forEach(cell => {
+          if (cell.textContent === num) {
+            cell.classList.add("highlighted");
+          }
+        });
+      }
+      function removeSearchHighlight() {
+        cells.forEach(cell => cell.classList.remove("highlighted"));
+      }
+
+      searchBtn.addEventListener("click", searchNumber);
+      removeBtn.addEventListener("click", removeSearchHighlight);
+      randomizeBtn.addEventListener("click", randomizeNumbers);
+
+      initializeGrid();
+      loadGameState();
+    });
+  </script>
+</body>
+</html>
