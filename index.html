@@ -150,7 +150,7 @@
 
     <div class="game-container" id="game-grid"></div>
     <div class="stats">
-      Completed Lines: <span id="completed-rows">0</span>/3
+      Completed Lines: <span id="completed-rows">0</span>/1
     </div>
     <div class="bingo-message" id="bingo-message"></div>
 
@@ -289,9 +289,9 @@
         }
 
         function checkBingo() {
-          if (completedRows >= 3) {
+          if (completedRows >= 1) {
             bingoMessage.textContent = "BINGO!";
-            alert("Congratulations! You have completed 3 lines!");
+            alert("Congratulations! You have completed 1 lines!");
           }
         }
 
